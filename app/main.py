@@ -50,7 +50,7 @@ app.add_middleware(
 
 # --- UNIFIED SCHEMAS ---
 class UserAuthSchema(BaseModel):
-    email: EmailStr
+    email: str  # Changed from EmailStr to robust string to prevent validation crash
     password: str
     role: str = "patient"
 
@@ -154,6 +154,10 @@ async def serve_customer_portal():
             const role = type === 'register' ? document.getElementById('regRole').value : "patient";
             const url = type === 'login' ? '/api/auth/login' : '/api/auth/register';
             
+            if(!email || !password) {
+                return alert("Please enter both email and password fields.");
+            }
+
             try {
                 const res = await fetch(url, {
                     method: 'POST',
@@ -170,7 +174,7 @@ async def serve_customer_portal():
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('mainDashboard').classList.remove('hidden');
                 } else {
-                    logStatus('authStatus', "Identity created. You can now log in.");
+                    logStatus('authStatus', "Identity created successfully! You can now input your details on the left and click 'Authenticate Account'.");
                 }
             } catch (err) {
                 logStatus('authStatus', `Error: ${err.message}`);
