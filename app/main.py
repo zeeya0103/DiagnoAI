@@ -1,8 +1,7 @@
 # app/main.py
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -21,9 +20,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="diagnoAI Enterprise Production Backend System Engine", version="2.0.0")
 
-# Initialize and configure the Jinja2 template engine for your frontend HTML
-templates = Jinja2Templates(directory="templates")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,11 +28,184 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- PORTAL INTERFACE CONTROLLER ---
+# --- PORTAL INTERFACE CONTROLLER (INLINE FALLBACK) ---
 @app.get("/", response_class=HTMLResponse)
-async def serve_customer_portal(request: Request):
-    """Serves the complete secure front-end dashboard interface directly to customers"""
-    return templates.TemplateResponse("index.html", {"request": request})
+async def serve_customer_portal():
+    """Serves the complete secure front-end dashboard interface directly to customers out of memory"""
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>diagnoAI Enterprise Portal</title>
+        <style>
+            * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+            body { background: #f0f2f5; color: #333; margin: 0; padding: 20px; }
+            .wrapper { max-width: 900px; margin: 0 auto; }
+            header { background: #0052cc; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+            .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            @media(max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+            input, textarea, select { width: 100%; padding: 10px; margin: 8px 0 16px; border: 1px solid #ccc; border-radius: 6px; }
+            button { background: #0052cc; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+            button:hover { background: #003d99; }
+            .hidden { display: none; }
+            .status-box { padding: 12px; background: #e6f0ff; border-left: 4px solid #0052cc; margin-top: 10px; border-radius: 4px; font-family: monospace; font-size: 13px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+        </style>
+    </head>
+    <body>
+    <div class="wrapper">
+        <header>
+            <h1>🏥 diagnoAI Customer Hub</h1>
+            <p>Enterprise Production Portal Engine</p>
+        </header>
+
+        <div id="authSection" class="card">
+            <h3>🔐 Secure Identity Gate</h3>
+            <div class="grid">
+                <div>
+                    <h4>Sign In</h4>
+                    <input type="email" id="loginEmail" placeholder="email@example.com">
+                    <input type="password" id="loginPass" placeholder="Password">
+                    <button onclick="handleAuth('login')">Authenticate Account</button>
+                </div>
+                <div>
+                    <h4>Register Account</h4>
+                    <input type="email" id="regEmail" placeholder="email@example.com">
+                    <input type="password" id="regPass" placeholder="Password">
+                    <select id="regRole">
+                        <option value="patient">Patient Client Profile</option>
+                        <option value="admin">System Administration Operator</option>
+                    </select>
+                    <button onclick="handleAuth('register')">Provision Identity</button>
+                </div>
+            </div>
+            <div id="authStatus" class="status-box hidden"></div>
+        </div>
+
+        <div id="mainDashboard" class="hidden">
+            <div class="card">
+                <h3>📄 Diagnostic Data Extraction (OCR)</h3>
+                <p>Upload your lab result PDF report to parse structural telemetry metrics into the engine layer.</p>
+                <input type="file" id="reportFile" accept=".pdf">
+                <button onclick="uploadReport()">Upload & Execute Clinical OCR</button>
+                <div id="ocrStatus" class="status-box hidden"></div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>💬 Context-Aware AI Chat</h3>
+                    <p>Discuss insights calculated directly from your uploaded diagnostic profile tracking logs.</p>
+                    <textarea id="chatMsg" placeholder="Ask diagnoAI about your results..."></textarea>
+                    <button onclick="sendChatMessage()">Execute Context Inquiry</button>
+                    <div id="chatStatus" class="status-box hidden"></div>
+                </div>
+
+                <div class="card">
+                    <h3>📅 Home Sample Collection Scheduler</h3>
+                    <input type="text" id="bookAddress" placeholder="Physical Logistics Delivery Address">
+                    <label>Preferred Dispatch Time Slot</label>
+                    <input type="datetime-local" id="bookSlot">
+                    <button onclick="bookCollection()">Schedule Home Collection</button>
+                    <div id="bookStatus" class="status-box hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let TOKEN = "";
+
+        function logStatus(elementId, text, isRaw = false) {
+            const el = document.getElementById(elementId);
+            el.classList.remove('hidden');
+            el.innerText = isRaw ? text : `[SYSTEM LOG]: ${text}`;
+        }
+
+        async function handleAuth(type) {
+            const email = document.getElementById(type === 'login' ? 'loginEmail' : 'regEmail').value;
+            const password = document.getElementById(type === 'login' ? 'loginPass' : 'regPass').value;
+            const role = type === 'register' ? document.getElementById('regRole').value : "patient";
+            const url = type === 'login' ? '/api/auth/login' : '/api/auth/register';
+            
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, role })
+                });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.detail || "Transaction validation crash.");
+
+                if (type === 'login') {
+                    TOKEN = data.access_token;
+                    logStatus('authStatus', "Access Token verified successfully. Opening Dashboard Secure Scope.");
+                    document.getElementById('authSection').classList.add('hidden');
+                    document.getElementById('mainDashboard').classList.remove('hidden');
+                } else {
+                    logStatus('authStatus', "Identity matrix initialized. You may now Sign In.");
+                }
+            } catch (err) {
+                logStatus('authStatus', `Error: ${err.message}`);
+            }
+        }
+
+        async function uploadReport() {
+            const fileInput = document.getElementById('reportFile');
+            if (!fileInput.files[0]) return alert("Select file first.");
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            logStatus('ocrStatus', "Streaming binary payload to structural parsing array...");
+            try {
+                const res = await fetch('/api/patient/reports/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${TOKEN}` },
+                    body: formData
+                });
+                const data = await res.json();
+                logStatus('ocrStatus', JSON.stringify(data, null, 2), true);
+            } catch (err) {
+                logStatus('ocrStatus', `Execution Fail: ${err.message}`);
+            }
+        }
+
+        async function sendChatMessage() {
+            const msg = document.getElementById('chatMsg').value;
+            try {
+                const res = await fetch('/api/patient/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` },
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await res.json();
+                logStatus('chatStatus', `diagnoAI Response:\\n${data.reply}`, true);
+            } catch (err) {
+                logStatus('chatStatus', `Execution Fail: ${err.message}`);
+            }
+        }
+
+        async function bookCollection() {
+            const address = document.getElementById('bookAddress').value;
+            const preferred_slot = document.getElementById('bookSlot').value;
+            try {
+                const res = await fetch('/api/patient/book-collection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` },
+                    body: JSON.stringify({ address, preferred_slot })
+                });
+                const data = await res.json();
+                logStatus('bookStatus', `Booking Locked. ID: ${data.id}`, true);
+            } catch (err) {
+                logStatus('bookStatus', `Execution Fail: ${err.message}`);
+            }
+        }
+    </script>
+    </body>
+    </html>
+    """
 
 # --- MODULE 1: AUTHENTICATION ROUTING CONTROLLER ---
 @app.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -64,13 +233,9 @@ async def upload_and_process_report(
     db: Session = Depends(get_db)
 ):
     contents = await file.read()
-    # 1. Parse metrics out via local structural OCR script
     metrics = parse_pdf_document_stream(contents)
-    
-    # 2. Feed parsed metrics to Analysis Engine
     insights = generate_health_analysis(metrics)
 
-    # 3. Store the records securely in the database using the unified session manager
     report = LabReport(user_id=current_user.id, file_name=file.filename)
     db.add(report)
     db.commit()
@@ -94,11 +259,9 @@ def fetch_personal_reports(current_user: User = Depends(RoleChecker(["patient"])
 # --- MODULE 6: CONTEXT-AWARE CONVERSATIONAL MEMORY CHAT ---
 @app.post("/api/patient/chat", response_model=ChatResponseSchema)
 def engage_ai_chat(payload: ChatMessageSchema, current_user: User = Depends(RoleChecker(["patient"])), db: Session = Depends(get_db)):
-    # Pull conversation history across sessions to establish memory context
     recent_logs = db.query(ChatHistory).filter(ChatHistory.user_id == current_user.id).order_by(ChatHistory.timestamp.desc()).limit(10).all()
     recent_logs.reverse()
 
-    # Pull the latest lab metrics to provide tailored, context-aware answers
     latest_report = db.query(LabReport).filter(LabReport.user_id == current_user.id).order_by(LabReport.uploaded_at.desc()).first()
     
     context_string = "You are an on-premise medical diagnostic assistant. Translate medical jargon simply."
@@ -107,12 +270,10 @@ def engage_ai_chat(payload: ChatMessageSchema, current_user: User = Depends(Role
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        # Offline rule-based chatbot fallback response matrix
         q = payload.message.lower()
         reply = "Local Engine Response: Please bring anomalous parameter arrays directly to your doctor."
         if "glucose" in q or "sugar" in q: reply = "Fasting glucose markers indicate glycemic saturation thresholds. Limit simple sugar intake."
     else:
-        # Build out a conversational message payload including historical context
         client = OpenAI(api_key=api_key)
         messages = [{"role": "system", "content": context_string}]
         for log in recent_logs:
@@ -125,7 +286,6 @@ def engage_ai_chat(payload: ChatMessageSchema, current_user: User = Depends(Role
         except Exception:
             reply = "Network execution failure. Please ensure data parameters are reviewed by human clinicians."
 
-    # Commit conversational histories to support future analytical cycles
     db.add(ChatHistory(user_id=current_user.id, role="user", message=payload.message))
     db.add(ChatHistory(user_id=current_user.id, role="assistant", message=reply))
     db.commit()
@@ -139,7 +299,6 @@ def place_collection_request(booking_in: BookingCreate, bg_tasks: BackgroundTask
     db.commit()
     db.refresh(new_booking)
     
-    # Push notification alerts out asynchronously using background task workers
     bg_tasks.add_task(send_booking_alert_email, new_booking.id, current_user.email, str(new_booking.preferred_slot), new_booking.address)
     return new_booking
 
