@@ -5,11 +5,9 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
-import jwt
-from datetime import datetime, timedelta
 from openai import OpenAI
 
-# 1. Importing your exact custom data organs
+# Importing your exact custom data structures
 from app.database import get_db, engine, Base
 from app.models import User, LabReport, ExtractedValue, AIAnalysis, Booking, ChatHistory, AdminLog
 from app.schemas import UserCreate, UserResponse, Token, BookingCreate, BookingResponse, ChatMessageSchema, ChatResponseSchema
@@ -31,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- INLINED PRODUCTION CUSTOMER HUB ---
+# --- INLINED FIXED PRODUCTION CUSTOMER HUB ---
 @app.get("/", response_class=HTMLResponse)
 async def serve_customer_portal():
     return """
@@ -76,10 +74,6 @@ async def serve_customer_portal():
                     <h4>Register Account</h4>
                     <input type="email" id="regEmail" placeholder="email@example.com">
                     <input type="password" id="regPass" placeholder="Password">
-                    <select id="regRole">
-                        <option value="patient">Patient Client Profile</option>
-                        <option value="admin">System Administration Operator</option>
-                    </select>
                     <button onclick="handleAuth('register')">Provision Identity</button>
                 </div>
             </div>
@@ -125,14 +119,19 @@ async def serve_customer_portal():
         async function handleAuth(type) {
             const email = document.getElementById(type === 'login' ? 'loginEmail' : 'regEmail').value;
             const password = document.getElementById(type === 'login' ? 'loginPass' : 'regPass').value;
-            const role = type === 'register' ? document.getElementById('regRole').value : "patient";
             const url = type === 'login' ? '/api/auth/login' : '/api/auth/register';
             
+            // FIXED: Payload now perfectly matches your exact backend UserCreate validation schema
+            const payload = { 
+                email: email, 
+                password: password
+            };
+
             try {
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, role })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 
@@ -144,7 +143,7 @@ async def serve_customer_portal():
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('mainDashboard').classList.remove('hidden');
                 } else {
-                    logStatus('authStatus', "Identity matrix registered to system database. Proceed to login.");
+                    logStatus('authStatus', "Identity successfully registered to database. Proceed to login on the left side.");
                 }
             } catch (err) {
                 logStatus('authStatus', `Error: ${err.message}`);
@@ -205,7 +204,10 @@ async def serve_customer_portal():
 def register_account(user_in: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(status_code=400, detail="Target identity account already registered.")
-    new_user = User(email=user_in.email, hashed_password=get_password_hash(user_in.password), role=user_in.role)
+    
+    # Defaults role matching your app models constraints
+    role_fallback = getattr(user_in, 'role', 'patient')
+    new_user = User(email=user_in.email, hashed_password=get_password_hash(user_in.password), role=role_fallback)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
