@@ -12,7 +12,7 @@ from typing import List
 from openai import OpenAI
 from passlib.context import CryptContext
 
-# --- FAILSALFE SELF-CONTAINED CRYPTO CONFIG ---
+# --- FAILSAFE SELF-CONTAINED CRYPTO CONFIG ---
 SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-production-key-fallback-999")
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -43,12 +43,6 @@ class LocalUser(Base):
     hashed_password = Column(String)
     role = Column(String, default="patient")
 
-class LocalReport(Base):
-    __tablename__ = "local_reports"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer)
-    file_name = Column(String)
-
 Base.metadata.create_all(bind=engine)
 
 def get_local_db():
@@ -69,11 +63,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- SCHEMAS ---
+# --- FIXED SCHEMAS ---
 class LocalUserCreate(BaseModel):
     email: EmailStr
     password: str
     role: str = "patient"
+
+class ChatMessageSchema(BaseModel):  # <-- ADDED AND DEFINED TO FIX NAMEERROR
+    message: str
 
 # --- INLINED USER PORTAL FRONTEND ---
 @app.get("/", response_class=HTMLResponse)
@@ -93,7 +90,7 @@ async def serve_customer_portal():
             .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
             @media(max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-            input, textarea, select { width: 100%; padding: 10px; margin: 8px 0 16px; border: 1px solid #ccc; border-radius: 6px; }
+            input, textarea, select { width: 100%; padding: 10px; margin: 8px 0 166px; border: 1px solid #ccc; border-radius: 6px; }
             button { background: #0052cc; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
             button:hover { background: #003d99; }
             .hidden { display: none; }
