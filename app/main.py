@@ -1,5 +1,7 @@
 # app/main.py
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
@@ -19,6 +21,9 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="diagnoAI Enterprise Production Backend System Engine", version="2.0.0")
 
+# Initialize and configure the Jinja2 template engine for your frontend HTML
+templates = Jinja2Templates(directory="templates")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,6 +31,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- PORTAL INTERFACE CONTROLLER ---
+@app.get("/", response_class=HTMLResponse)
+async def serve_customer_portal(request: Request):
+    """Serves the complete secure front-end dashboard interface directly to customers"""
+    return templates.TemplateResponse("index.html", {"request": request})
 
 # --- MODULE 1: AUTHENTICATION ROUTING CONTROLLER ---
 @app.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -49,7 +60,7 @@ def authenticate_user(user_in: UserCreate, db: Session = Depends(get_db)):
 @app.post("/api/patient/reports/upload", status_code=status.HTTP_201_CREATED)
 async def upload_and_process_report(
     file: UploadFile = File(...), 
-    current_user: User = Depends(RoleChecker(["patient"])), # FIXED: Removed nested Depends statement
+    current_user: User = Depends(RoleChecker(["patient"])), 
     db: Session = Depends(get_db)
 ):
     contents = await file.read()
