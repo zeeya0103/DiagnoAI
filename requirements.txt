@@ -1,3 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
+sqlalchemy
+pydantic-settings
+python-multipart
+requests
+aiofiles
+jinja2
