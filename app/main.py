@@ -1,44 +1,27 @@
 # app/main.py
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+from typing import List
 import os
 import jwt
 from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, EmailStr
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from passlib.context import CryptContext
+from openai import OpenAI
 
-# --- GLOBAL SECURITY ---
-SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-production-key-fallback-999")
-ALGORITHM = "HS256"
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 1. Importing your exact custom data organs
+from app.database import get_db, engine, Base
+from app.models import User, LabReport, ExtractedValue, AIAnalysis, Booking, ChatHistory, AdminLog
+from app.schemas import UserCreate, UserResponse, Token, BookingCreate, BookingResponse, ChatMessageSchema, ChatResponseSchema
+from app.auth import get_password_hash, verify_password, create_access_token, get_current_user, RoleChecker
+from app.engine.ocr_processor import parse_pdf_document_stream
+from app.engine.ai_analyzer import generate_health_analysis
+from app.services.email_service import send_booking_alert_email
 
-# --- DATABASE SETUP ---
-DATABASE_URL = "sqlite:////code/data/diagnoai.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class LocalUser(Base):
-    __tablename__ = "local_users"
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    role = Column(String, default="patient")
-
+# Build schemas out dynamically using your unified engine structure
 Base.metadata.create_all(bind=engine)
 
-def get_local_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# --- FASTAPI ENGINE ---
-app = FastAPI(title="diagnoAI Fixed Engine", version="2.6.0")
+app = FastAPI(title="diagnoAI Enterprise Production Backend System Engine", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,16 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- UNIFIED SCHEMAS ---
-class UserAuthSchema(BaseModel):
-    email: str  # Changed from EmailStr to robust string to prevent validation crash
-    password: str
-    role: str = "patient"
-
-class ChatMessageSchema(BaseModel):
-    message: str
-
-# --- INLINED USER PORTAL ---
+# --- INLINED PRODUCTION CUSTOMER HUB ---
 @app.get("/", response_class=HTMLResponse)
 async def serve_customer_portal():
     return """
@@ -154,10 +128,6 @@ async def serve_customer_portal():
             const role = type === 'register' ? document.getElementById('regRole').value : "patient";
             const url = type === 'login' ? '/api/auth/login' : '/api/auth/register';
             
-            if(!email || !password) {
-                return alert("Please enter both email and password fields.");
-            }
-
             try {
                 const res = await fetch(url, {
                     method: 'POST',
@@ -166,15 +136,15 @@ async def serve_customer_portal():
                 });
                 const data = await res.json();
                 
-                if (!res.ok) throw new Error(data.detail || "Transaction verification failed.");
+                if (!res.ok) throw new Error(data.detail || "Authentication processing exception.");
 
                 if (type === 'login') {
                     TOKEN = data.access_token;
-                    logStatus('authStatus', "Access Token verified successfully. Dashboard unlocked.");
+                    logStatus('authStatus', "Access token issued successfully. System panel unlocked.");
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('mainDashboard').classList.remove('hidden');
                 } else {
-                    logStatus('authStatus', "Identity created successfully! You can now input your details on the left and click 'Authenticate Account'.");
+                    logStatus('authStatus', "Identity matrix registered to system database. Proceed to login.");
                 }
             } catch (err) {
                 logStatus('authStatus', `Error: ${err.message}`);
@@ -183,11 +153,11 @@ async def serve_customer_portal():
 
         async function uploadReport() {
             const fileInput = document.getElementById('reportFile');
-            if (!fileInput.files[0]) return alert("Select file first.");
+            if (!fileInput.files[0]) return alert("Please select a file.");
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
 
-            logStatus('ocrStatus', "Uploading PDF binary metadata to parsing array...");
+            logStatus('ocrStatus', "Uploading PDF binary payload to parsing array...");
             try {
                 const res = await fetch('/api/patient/reports/upload', {
                     method: 'POST',
@@ -230,37 +200,120 @@ async def serve_customer_portal():
     </html>
     """
 
-# --- AUTH ROUTING WITH UNIFIED SCHEMA ---
-@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
-def register_account(user_in: UserAuthSchema, db: Session = Depends(get_local_db)):
-    existing = db.query(LocalUser).filter(LocalUser.email == user_in.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Account already registered.")
-    hashed = pwd_context.hash(user_in.password)
-    new_user = LocalUser(email=user_in.email, hashed_password=hashed, role=user_in.role)
+# --- MODULE 1: AUTHENTICATION ROUTING CONTROLLER ---
+@app.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register_account(user_in: UserCreate, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == user_in.email).first():
+        raise HTTPException(status_code=400, detail="Target identity account already registered.")
+    new_user = User(email=user_in.email, hashed_password=get_password_hash(user_in.password), role=user_in.role)
     db.add(new_user)
     db.commit()
-    return {"status": "success", "email": new_user.email}
+    db.refresh(new_user)
+    return new_user
 
-@app.post("/api/auth/login")
-def authenticate_user(user_in: UserAuthSchema, db: Session = Depends(get_local_db)):
-    user = db.query(LocalUser).filter(LocalUser.email == user_in.email).first()
-    if not user or not pwd_context.verify(user_in.password, user.hashed_password):
+@app.post("/api/auth/login", response_model=Token)
+def authenticate_user(user_in: UserCreate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_in.email).first()
+    if not user or not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Authentication verification failed.")
+    return {"access_token": create_access_token({"sub": user.email}), "token_type": "bearer"}
+
+# --- MODULE 2: PATIENT ENDPOINT ROUTERS & PROCESSING ---
+@app.post("/api/patient/reports/upload", status_code=status.HTTP_201_CREATED)
+async def upload_and_process_report(
+    file: UploadFile = File(...), 
+    current_user: User = Depends(RoleChecker(["patient"])), 
+    db: Session = Depends(get_db)
+):
+    contents = await file.read()
+    metrics = parse_pdf_document_stream(contents)
+    insights = generate_health_analysis(metrics)
+
+    report = LabReport(user_id=current_user.id, file_name=file.filename)
+    db.add(report)
+    db.commit()
+
+    extracted = ExtractedValue(report_id=report.id, **metrics)
+    analysis = AIAnalysis(report_id=report.id, **insights)
+    db.add(extracted)
+    db.add(analysis)
+    db.commit()
+
+    return {"report_id": report.id, "extracted_metrics": metrics, "clinical_analysis": insights}
+
+@app.get("/api/patient/reports", status_code=status.HTTP_200_OK)
+def fetch_personal_reports(current_user: User = Depends(RoleChecker(["patient"])), db: Session = Depends(get_db)):
+    reports = db.query(LabReport).filter(LabReport.user_id == current_user.id).all()
+    return [{
+        "report_id": r.id, "file_name": r.file_name, "uploaded_at": r.uploaded_at,
+        "metrics": r.extracted_values, "analysis": r.ai_analysis
+    } for r in reports]
+
+# --- MODULE 6: CONTEXT-AWARE CONVERSATIONAL MEMORY CHAT ---
+@app.post("/api/patient/chat", response_model=ChatResponseSchema)
+def engage_ai_chat(payload: ChatMessageSchema, current_user: User = Depends(RoleChecker(["patient"])), db: Session = Depends(get_db)):
+    recent_logs = db.query(ChatHistory).filter(ChatHistory.user_id == current_user.id).order_by(ChatHistory.timestamp.desc()).limit(10).all()
+    recent_logs.reverse()
+
+    latest_report = db.query(LabReport).filter(LabReport.user_id == current_user.id).order_by(LabReport.uploaded_at.desc()).first()
     
-    expire = datetime.utcnow() + timedelta(days=1)
-    token = jwt.encode({"sub": user.email, "role": user.role, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
-    return {"access_token": token, "token_type": "bearer"}
+    context_string = "You are an on-premise medical diagnostic assistant. Translate medical jargon simply."
+    if latest_report and latest_report.ai_analysis:
+        context_string += f" Patient's latest test status: {latest_report.ai_analysis.status}. Risk Profile: {latest_report.ai_analysis.risk_level}."
 
-# --- SYSTEM STUBS ---
-@app.post("/api/patient/reports/upload")
-async def upload_and_process_report():
-    return {"status": "success", "msg": "Document parsed."}
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        q = payload.message.lower()
+        reply = "Local Engine Response: Please bring anomalous parameter arrays directly to your doctor."
+        if "glucose" in q or "sugar" in q: reply = "Fasting glucose markers indicate glycemic saturation thresholds. Limit simple sugar intake."
+    else:
+        client = OpenAI(api_key=api_key)
+        messages = [{"role": "system", "content": context_string}]
+        for log in recent_logs:
+            messages.append({"role": log.role, "content": log.message})
+        messages.append({"role": "user", "content": payload.message})
 
-@app.post("/api/patient/chat")
-def engage_ai_chat(payload: ChatMessageSchema):
-    return {"reply": "Connection live. Diagnostic matrix fully calibrated."}
+        try:
+            res = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+            reply = res.choices[0].message.content
+        except Exception:
+            reply = "Network execution failure. Please ensure data parameters are reviewed by human clinicians."
 
-@app.post("/api/patient/book-collection")
-def place_collection_request():
-    return {"id": 777, "status": "Collection verified."}
+    db.add(ChatHistory(user_id=current_user.id, role="user", message=payload.message))
+    db.add(ChatHistory(user_id=current_user.id, role="assistant", message=reply))
+    db.commit()
+    return {"reply": reply}
+
+# --- MODULE 7: HOME SAMPLE COLLECTION SCHEDULING ---
+@app.post("/api/patient/book-collection", response_model=BookingResponse)
+def place_collection_request(booking_in: BookingCreate, bg_tasks: BackgroundTasks, current_user: User = Depends(RoleChecker(["patient"])), db: Session = Depends(get_db)):
+    new_booking = Booking(user_id=current_user.id, address=booking_in.address, preferred_slot=booking_in.preferred_slot)
+    db.add(new_booking)
+    db.commit()
+    db.refresh(new_booking)
+    
+    bg_tasks.add_task(send_booking_alert_email, new_booking.id, current_user.email, str(new_booking.preferred_slot), new_booking.address)
+    return new_booking
+
+# --- MODULE 3: SECURE LAB OPERATIONS DASHBOARD (ADMIN PRIVILEGES SCOPE) ---
+@app.get("/api/admin/dashboard-telemetry", dependencies=[Depends(RoleChecker(["admin"]))])
+def fetch_admin_system_metrics(db: Session = Depends(get_db)):
+    return {
+        "total_registered_patients": db.query(User).filter(User.role == "patient").count(),
+        "total_documents_processed": db.query(LabReport).count(),
+        "total_active_bookings": db.query(Booking).count()
+    }
+
+@app.get("/api/admin/bookings", response_model=List[BookingResponse], dependencies=[Depends(RoleChecker(["admin"]))])
+def manage_all_bookings(db: Session = Depends(get_db)):
+    return db.query(Booking).order_by(Booking.created_at.desc()).all()
+
+@app.patch("/api/admin/bookings/{booking_id}/status", dependencies=[Depends(RoleChecker(["admin"]))])
+def update_booking_status(booking_id: int, target_status: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking record not found.")
+    booking.status = target_status
+    db.add(AdminLog(admin_id=current_user.id, action=f"Modified status of booking #{booking_id} to {target_status}"))
+    db.commit()
+    return {"message": "System logs modified and processing status updated."}
