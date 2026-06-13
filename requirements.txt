@@ -20,3 +20,5 @@ cryptography
 psycopg2-binary
 pymysql
 asyncpg
+pypdf
+python-docx
