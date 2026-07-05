@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    background:#ffffff;
+    color:#000;
+    overflow-x:hidden;
+}
+
+/* Links */
+a{
+    text-decoration:none;
+    color:inherit;
+}
+
+/* Buttons */
+button{
+    cursor:pointer;
+    transition:0.3s ease;
+    border:none;
+    outline:none;
+}
+
+button:hover{
+    transform:translateY(-3px);
+    opacity:0.95;
+}
+
+/* Inputs */
+input,
+textarea,
+select{
+    width:100%;
+    padding:14px;
+    border:2px solid #FFD60A;
+    border-radius:10px;
+    outline:none;
+    font-size:16px;
+    transition:.3s;
+}
+
+input:focus,
+textarea:focus,
+select:focus{
+    border-color:#1976d2;
+    box-shadow:0 0 8px rgba(25,118,210,.3);
+}
+
+/* Images */
+img{
+    max-width:100%;
+    display:block;
+}
+
+/* Lists */
+ul{
+    list-style:none;
+}
+
+/* Container */
+.container{
+    width:90%;
+    max-width:1400px;
+    margin:auto;
+}
+
+/* Card */
+.card{
+    background:#fff;
+    border:3px solid #FFD60A;
+    border-radius:20px;
+    padding:25px;
+    box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+
+/* Titles */
+.title{
+    color:#d62828;
+    font-size:38px;
+    font-weight:700;
+}
+
+.subtitle{
+    color:#666;
+    font-size:16px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{
+    width:8px;
+}
+
+::-webkit-scrollbar-track{
+    background:#f1f1f1;
+}
+
+::-webkit-scrollbar-thumb{
+    background:#d62828;
+    border-radius:10px;
+}
+
+::-webkit-scrollbar-thumb:hover{
+    background:#b71c1c;
+}
+
+/* Selection */
+::selection{
+    background:#d62828;
+    color:#fff;
+}

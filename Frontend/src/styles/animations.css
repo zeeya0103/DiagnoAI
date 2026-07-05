@@ -1,0 +1,137 @@
+.fade-in{
+
+animation:fadeIn .8s ease;
+
+}
+
+@keyframes fadeIn{
+
+0%{
+
+opacity:0;
+transform:translateY(20px);
+
+}
+
+100%{
+
+opacity:1;
+transform:translateY(0);
+
+}
+
+}
+
+.slide-left{
+
+animation:slideLeft .8s;
+
+}
+
+@keyframes slideLeft{
+
+0%{
+
+opacity:0;
+transform:translateX(-40px);
+
+}
+
+100%{
+
+opacity:1;
+transform:translateX(0);
+
+}
+
+}
+
+.slide-right{
+
+animation:slideRight .8s;
+
+}
+
+@keyframes slideRight{
+
+0%{
+
+opacity:0;
+transform:translateX(40px);
+
+}
+
+100%{
+
+opacity:1;
+transform:translateX(0);
+
+}
+
+}
+
+.zoom{
+
+animation:zoom .5s;
+
+}
+
+@keyframes zoom{
+
+0%{
+
+transform:scale(.7);
+
+}
+
+100%{
+
+transform:scale(1);
+
+}
+
+}
+
+.float{
+
+animation:float 3s ease infinite;
+
+}
+
+@keyframes float{
+
+0%{
+
+transform:translateY(0);
+
+}
+
+50%{
+
+transform:translateY(-10px);
+
+}
+
+100%{
+
+transform:translateY(0);
+
+}
+
+}
+
+.rotate{
+
+animation:rotate 12s linear infinite;
+
+}
+
+@keyframes rotate{
+
+100%{
+
+transform:rotate(360deg);
+
+}
+
+}
