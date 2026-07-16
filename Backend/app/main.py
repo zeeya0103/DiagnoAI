@@ -30,11 +30,7 @@ client = Groq(
 
 app = FastAPI()
 
-# ✅ ONLY ROUTERS (KEEP THIS)
-app.include_router(appointment_router)
-app.include_router(reports_router)
-app.include_router(chatbot_router)
-
+_
 # ==========================
 # CORS
 # ==========================
@@ -49,7 +45,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+app.include_router(appointment_router)
+app.include_router(reports_router)
+app.include_router(chatbot_router)
 # ==========================
 # MODELS
 # ==========================
