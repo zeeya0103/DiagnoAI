@@ -43,7 +43,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://diagnocare-finale.vercel.app/"
+        "https://diagnocare-finale.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
