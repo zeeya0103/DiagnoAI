@@ -28,7 +28,7 @@ useEffect(() => {
 
 const fetchReports = async () => {
     try {
-        const res = await axios.get("http://127.0.0.1:8000/reports/");
+        const res = await axios.get("https://diagnoai-1-xywq.onrender.com/reports/");
         setReports(res.data.length);
     } catch (err) {
         console.log(err);
@@ -37,7 +37,7 @@ const fetchReports = async () => {
 
 const fetchAppointments = async () => {
     try {
-        const res = await axios.get("http://127.0.0.1:8000/appointments/");
+        const res = await axios.get("https://diagnoai-1-xywq.onrender.com/appointments/");
         setAppointments(res.data.length);
     } catch (err) {
         console.log(err);

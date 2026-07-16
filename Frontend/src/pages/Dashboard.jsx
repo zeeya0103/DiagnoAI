@@ -32,7 +32,7 @@ function Dashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:8000/dashboard");
+      const res = await axios.get("https://diagnoai-1-xywq.onrender.com/dashboard");
       setStats(res.data);
     } catch (error) {
       console.log(error);

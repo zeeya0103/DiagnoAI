@@ -20,7 +20,7 @@ try{
 
 const res=await axios.get(
 
-"http://127.0.0.1:8000/admin/users",
+"https://diagnoai-1-xywq.onrender.com/admin/users",
 
 {
 
