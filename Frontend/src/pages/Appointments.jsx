@@ -30,7 +30,7 @@ function Appointments() {
     try {
 
       await axios.post(
-        "https://diagnoai-1-xywq.onrender.com/appointments",
+        "https://diagnoai-1-xywq.onrender.com/appointments/",
         form,
         {
           headers: {
