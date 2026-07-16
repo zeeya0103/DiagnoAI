@@ -6,6 +6,11 @@ import os
 
 from app.database import get_db
 from app.models.report import Report
+from app.models.user import User
+
+from app.services.pdf_parser import PDFParser
+from app.services.report_interpreter import ReportInterpreter
+from app.services.ml_service import predict_disease
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -13,50 +18,112 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-# ==========================
-# UPLOAD REPORT
-# ==========================
 @router.post("/upload")
 async def upload_report(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
 
-    try:
-        if not file:
-            raise HTTPException(status_code=400, detail="No file uploaded")
-
-        filename = f"{uuid4()}_{file.filename}"
-        path = os.path.join(UPLOAD_DIR, filename)
-
-        with open(path, "wb") as f:
-            f.write(await file.read())
-
-        report = Report(
-            user_id=1,
-            file_name=file.filename,
-            file_path=path,
-            prediction="Processing",
-            risk="Unknown",
-            created_at=datetime.utcnow()
+    if not file:
+        raise HTTPException(
+            status_code=400,
+            detail="No file uploaded"
         )
 
-        db.add(report)
-        db.commit()
-        db.refresh(report)
+    filename = f"{uuid4()}_{file.filename}"
+    path = os.path.join(UPLOAD_DIR, filename)
 
-        return {"message": "Uploaded", "id": report.id}
+    with open(path, "wb") as f:
+        f.write(await file.read())
 
-    except Exception as e:
-        # 🔥 THIS WILL SHOW REAL ERROR IN FRONTEND
-        raise HTTPException(status_code=500, detail=str(e))
+    # ==========================
+    # Extract PDF Text
+    # ==========================
 
+    text = PDFParser.extract_text(path)
 
-# ==========================
-# GET REPORTS
-# ==========================
-def get_reports(db: Session = Depends(get_db)):
+    print("\n========== PDF TEXT ==========")
+    print(text)
+    print("==============================\n")
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to extract text from the PDF."
+        )
+
+    # ==========================
+    # Extract Parameters
+    # ==========================
+
+    values = ReportInterpreter.extract_parameters(text)
+
+    print("\n========== PARAMETERS ==========")
+    print(values)
+    print("================================\n")
+
+    hb = values.get("hemoglobin")
+    glucose = values.get("glucose")
+
+    # ==========================
+    # ML Prediction
+    # ==========================
+
     try:
-        return db.query(Report).all()
+
+        if hb is not None and glucose is not None:
+
+            prediction = predict_disease(
+                hb,
+                glucose
+            )
+
+        else:
+
+            prediction = "Unable to Predict"
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+        print("Prediction Error:", e)
+
+        prediction = "Prediction Failed"
+
+    # ==========================
+    # Risk Level
+    # ==========================
+
+    if prediction in ["Normal", "Healthy"]:
+        risk = "Low"
+
+    elif prediction in ["Diabetes", "Diabetes Risk"]:
+        risk = "High"
+
+    elif prediction in ["Anaemia", "Anemia", "Anaemia Risk"]:
+        risk = "Moderate"
+
+    else:
+        risk = "Unknown"
+
+    # ==========================
+    # Save Report
+    # ==========================
+
+    report = Report(
+        file_name=file.filename,
+        file_path=path,
+        prediction=prediction,
+        risk=risk,
+        created_at=datetime.utcnow()
+    )
+
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    return {
+        "message": "Report Uploaded Successfully",
+        "prediction": prediction,
+        "risk": risk,
+        "parameters": values,
+        "summary": ReportInterpreter.health_summary(values)
+    }

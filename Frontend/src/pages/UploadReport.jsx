@@ -2,6 +2,7 @@ import { useState } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import Footer from "../components/Footer";
+import ReportCard from "../components/ReportCard";
 
 import { motion } from "framer-motion";
 import { FaCloudUploadAlt, FaFileMedical } from "react-icons/fa";
@@ -10,29 +11,27 @@ import toast from "react-hot-toast";
 
 function UploadReport() {
 
-    const [file,setFile]=useState(null);
+    const [file, setFile] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-    const [loading,setLoading]=useState(false);
+    // NEW
+    const [report, setReport] = useState(null);
 
-    const upload=async()=>{
+    const upload = async () => {
 
-        if(!file){
-
+        if (!file) {
             toast.error("Select a PDF Report");
-
             return;
-
         }
 
-        const data=new FormData();
+        const data = new FormData();
+        data.append("file", file);
 
-        data.append("file",file);
-
-        try{
+        try {
 
             setLoading(true);
 
-            const res=await axios.post(
+            const res = await axios.post(
 
                 "http://127.0.0.1:8000/reports/upload",
 
@@ -40,11 +39,11 @@ function UploadReport() {
 
                 {
 
-                    headers:{
+                    headers: {
 
-                        Authorization:`Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
 
-                        "Content-Type":"multipart/form-data"
+                        "Content-Type": "multipart/form-data"
 
                     }
 
@@ -56,15 +55,32 @@ function UploadReport() {
 
             console.log(res.data);
 
+            // SAVE RESPONSE
+            setReport({
+
+                file_name: file.name,
+
+                prediction: res.data.prediction,
+
+                risk: res.data.risk,
+
+                parameters: res.data.parameters,
+
+                summary: res.data.summary
+
+            });
+
         }
 
-        catch{
+        catch (err) {
+
+            console.log(err);
 
             toast.error("Upload Failed");
 
         }
 
-        finally{
+        finally {
 
             setLoading(false);
 
@@ -72,231 +88,247 @@ function UploadReport() {
 
     };
 
-return(
+    return (
 
-<>
+        <>
 
-<Navbar/>
+            <Navbar />
 
-<div style={styles.container}>
+            <div style={styles.container}>
 
-<Sidebar/>
+                <Sidebar />
 
-<div style={styles.content}>
+                <div style={styles.content}>
 
-<motion.div
+                    <motion.div
 
-initial={{opacity:0,y:40}}
+                        initial={{ opacity: 0, y: 40 }}
 
-animate={{opacity:1,y:0}}
+                        animate={{ opacity: 1, y: 0 }}
 
-style={styles.card}
+                        style={styles.card}
 
->
+                    >
 
-<FaCloudUploadAlt
+                        <FaCloudUploadAlt
 
-size={80}
+                            size={80}
 
-color="#1976d2"
+                            color="#1976d2"
 
-/>
+                        />
 
-<h1 style={styles.heading}>
+                        <h1 style={styles.heading}>
 
-Upload Blood Report
+                            Upload Blood Report
 
-</h1>
+                        </h1>
 
-<p style={styles.text}>
+                        <p style={styles.text}>
 
-Supported Format : PDF
+                            Supported Format : PDF
 
-</p>
+                        </p>
 
-<label style={styles.uploadBox}>
+                        <label style={styles.uploadBox}>
 
-<input
+                            <input
 
-type="file"
+                                type="file"
 
-accept=".pdf"
+                                accept=".pdf"
 
-hidden
+                                hidden
 
-onChange={(e)=>setFile(e.target.files[0])}
+                                onChange={(e) => setFile(e.target.files[0])}
 
-/>
+                            />
 
-<FaFileMedical
+                            <FaFileMedical
 
-size={60}
+                                size={60}
 
-color="#d62828"
+                                color="#d62828"
 
-/>
+                            />
 
-<h3>
+                            <h3>
 
-Click to Select PDF
+                                Click to Select PDF
 
-</h3>
+                            </h3>
 
-</label>
+                        </label>
 
-{
+                        {
 
-file && (
+                            file && (
 
-<div style={styles.filename}>
+                                <div style={styles.filename}>
 
-{file.name}
+                                    {file.name}
 
-</div>
+                                </div>
 
-)
+                            )
+
+                        }
+
+                        <button
+
+                            onClick={upload}
+
+                            style={styles.button}
+
+                        >
+
+                            {
+
+                                loading
+
+                                    ?
+
+                                    "Uploading..."
+
+                                    :
+
+                                    "Upload Report"
+
+                            }
+
+                        </button>
+
+                    </motion.div>
+
+                    {/* SHOW AI RESULT */}
+
+                    {
+
+                        report && (
+
+                            <div style={{ marginTop: "40px" }}>
+
+                                <ReportCard report={report} />
+
+                            </div>
+
+                        )
+
+                    }
+
+                </div>
+
+            </div>
+
+            <Footer />
+
+        </>
+
+    );
 
 }
 
-<button
+const styles = {
 
-onClick={upload}
+    container: {
 
-style={styles.button}
+        display: "flex",
 
->
+        background: "#f8f9fa"
 
-{
+    },
 
-loading
+    content: {
 
-?
+        marginLeft: "270px",
 
-"Uploading..."
+        width: "100%",
 
-:
+        padding: "60px"
 
-"Upload Report"
+    },
 
-}
+    card: {
 
-</button>
+        background: "#fff",
 
-</motion.div>
+        border: "3px solid gold",
 
-</div>
+        padding: "40px",
 
-</div>
+        borderRadius: "20px",
 
-<Footer/>
+        maxWidth: "700px",
 
-</>
+        margin: "auto",
 
-);
+        textAlign: "center",
 
-}
+        boxShadow: "0 8px 25px rgba(0,0,0,.08)"
 
-const styles={
+    },
 
-container:{
+    heading: {
 
-display:"flex",
+        marginTop: "20px",
 
-background:"#f8f9fa"
+        color: "#d62828"
 
-},
+    },
 
-content:{
+    text: {
 
-marginLeft:"270px",
+        marginBottom: "30px"
 
-width:"100%",
+    },
 
-padding:"60px"
+    uploadBox: {
 
-},
+        display: "block",
 
-card:{
+        padding: "50px",
 
-background:"#fff",
+        border: "3px dashed #1976d2",
 
-border:"3px solid gold",
+        borderRadius: "20px",
 
-padding:"40px",
+        cursor: "pointer",
 
-borderRadius:"20px",
+        background: "#fafafa"
 
-maxWidth:"700px",
+    },
 
-margin:"auto",
+    filename: {
 
-textAlign:"center",
+        marginTop: "20px",
 
-boxShadow:"0 8px 25px rgba(0,0,0,.08)"
+        fontWeight: "bold",
 
-},
+        color: "#1976d2"
 
-heading:{
+    },
 
-marginTop:"20px",
+    button: {
 
-color:"#d62828"
+        marginTop: "30px",
 
-},
+        background: "#1976d2",
 
-text:{
+        color: "#fff",
 
-marginBottom:"30px"
+        padding: "15px 35px",
 
-},
+        border: "none",
 
-uploadBox:{
+        borderRadius: "10px",
 
-display:"block",
+        fontSize: "18px",
 
-padding:"50px",
+        fontWeight: "bold",
 
-border:"3px dashed #1976d2",
+        cursor: "pointer"
 
-borderRadius:"20px",
-
-cursor:"pointer",
-
-background:"#fafafa"
-
-},
-
-filename:{
-
-marginTop:"20px",
-
-fontWeight:"bold",
-
-color:"#1976d2"
-
-},
-
-button:{
-
-marginTop:"30px",
-
-background:"#1976d2",
-
-color:"#fff",
-
-padding:"15px 35px",
-
-border:"none",
-
-borderRadius:"10px",
-
-fontSize:"18px",
-
-fontWeight:"bold",
-
-cursor:"pointer"
-
-}
+    }
 
 };
 

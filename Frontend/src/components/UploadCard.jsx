@@ -3,123 +3,192 @@ import axios from "../api/axios";
 import toast from "react-hot-toast";
 import { FaCloudUploadAlt } from "react-icons/fa";
 
-function UploadCard(){
+function UploadCard() {
 
-const[file,setFile]=useState(null);
+    const [file, setFile] = useState(null);
 
-const upload=async()=>{
+    const [result, setResult] = useState(null);
 
-if(!file){
+    const upload = async () => {
 
-toast.error("Choose PDF");
+        if (!file) {
 
-return;
+            toast.error("Choose PDF");
 
-}
+            return;
 
-const formData=new FormData();
+        }
 
-formData.append("file",file);
+        const formData = new FormData();
 
-try{
+        formData.append("file", file);
 
-await axios.post(
+        try {
 
-"/reports/upload",
+            const res = await axios.post(
 
-formData,
+                "/reports/upload",
 
-{
+                formData,
 
-headers:{
+                {
 
-"Content-Type":"multipart/form-data",
+                    headers: {
 
-Authorization:`Bearer ${localStorage.getItem("token")}`
+                        "Content-Type": "multipart/form-data",
 
-}
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
 
-}
+                    }
 
-);
+                }
 
-toast.success("Report Uploaded");
+            );
 
-}
+            setResult(res.data);
 
-catch{
+            toast.success("Report Uploaded Successfully");
 
-toast.error("Upload Failed");
+        }
 
-}
+        catch (err) {
 
-};
+            console.log(err);
 
-return(
+            toast.error("Upload Failed");
 
-<div className="card">
+        }
 
-<h2 style={{color:"#d62828"}}>
+    };
 
-Upload Blood Report
+    return (
 
-</h2>
+        <div className="card">
 
-<div
+            <h2 style={{ color: "#d62828" }}>
+                Upload Blood Report
+            </h2>
 
-style={{
+            <div
+                style={{
+                    border: "3px dashed #1976d2",
+                    padding: "40px",
+                    borderRadius: "15px",
+                    textAlign: "center",
+                    marginTop: "20px"
+                }}
+            >
 
-border:"3px dashed #1976d2",
+                <FaCloudUploadAlt
+                    size={80}
+                    color="#1976d2"
+                />
 
-padding:"40px",
+                <br /><br />
 
-borderRadius:"15px",
+                <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setFile(e.target.files[0])}
+                />
 
-textAlign:"center",
+                <br />
 
-marginTop:"20px"
+                <button
+                    className="primary-btn"
+                    style={{ marginTop: "20px" }}
+                    onClick={upload}
+                >
+                    Upload Report
+                </button>
 
-}}
+            </div>
 
->
+            {result && (
 
-<FaCloudUploadAlt
+                <div
+                    style={{
+                        marginTop: "30px",
+                        background: "#fff",
+                        border: "3px solid gold",
+                        borderRadius: "15px",
+                        padding: "25px",
+                        boxShadow: "0 5px 15px rgba(0,0,0,.1)"
+                    }}
+                >
 
-size={80}
+                    <h2 style={{ color: "#d62828" }}>
+                        AI Analysis Result
+                    </h2>
 
-color="#1976d2"
+                    <p>
+                        <b>Disease:</b> {result.prediction}
+                    </p>
 
-/>
+                    <p>
+                        <b>Risk:</b> {result.risk}
+                    </p>
 
-<input
+                    <h3>Extracted Parameters</h3>
 
-type="file"
+                    <table
+                        style={{
+                            width: "100%",
+                            borderCollapse: "collapse"
+                        }}
+                    >
+                        <tbody>
 
-accept=".pdf"
+                            {Object.entries(result.parameters).map(([key, value]) => (
 
-onChange={(e)=>setFile(e.target.files[0])}
+                                <tr key={key}>
+                                    <td
+                                        style={{
+                                            padding: "8px",
+                                            borderBottom: "1px solid #ddd"
+                                        }}
+                                    >
+                                        <b>{key}</b>
+                                    </td>
 
-/>
+                                    <td
+                                        style={{
+                                            padding: "8px",
+                                            borderBottom: "1px solid #ddd"
+                                        }}
+                                    >
+                                        {value ?? "Not Found"}
+                                    </td>
+                                </tr>
 
-<button
+                            ))}
 
-className="primary-btn"
+                        </tbody>
+                    </table>
 
-style={{marginTop:"20px"}}
+                    <h3 style={{ marginTop: "20px" }}>
+                        Health Summary
+                    </h3>
 
-onClick={upload}
+                    <ul>
 
->
+                        {result.summary.map((item, index) => (
 
-Upload Report
+                            <li key={index}>
+                                {item}
+                            </li>
 
-</button>
+                        ))}
 
-</div>
+                    </ul>
 
-</div>
+                </div>
 
-);
+            )}
+
+        </div>
+
+    );
 
 }
 
