@@ -43,21 +43,20 @@ async def book_appointment(
     db: Session = Depends(get_db),
     current_user: FakeUser = Depends(get_fake_user)
 ):
-    try:
-        # Save appointment in database
-        appointment = AppointmentModel(
-            user_id=current_user.id,
-            patient_name=data.patient_name,
-            email=data.email,
-            phone=data.phone,
-            address=data.address,
-            date=data.date,
-            time=data.time
-        )
 
+    appointment = AppointmentModel(
+        user_id=current_user.id,
+        patient_name=data.patient_name,
+        email=data.email,
+        phone=data.phone,
+        address=data.address,
+        date=data.date,
+        time=data.time
+    )
+
+    try:
         db.add(appointment)
-        db.commit()
-        db.refresh(appointment)
+        db.flush()   # Create record but DO NOT commit yet
 
         admin_email = os.getenv(
             "ADMIN_EMAIL",
@@ -71,18 +70,21 @@ async def book_appointment(
             subject="Appointment Confirmed",
             recipients=[data.email],
             body=f"""
-            <h2>Appointment Confirmed</h2>
+            <h2>Appointment Confirmed ✅</h2>
 
-            <p>Hi <b>{data.patient_name}</b>,</p>
+            <p>Hello <b>{data.patient_name}</b>,</p>
 
             <p>Your appointment has been booked successfully.</p>
 
-            <p>
-            <b>Date:</b> {data.date}<br>
-            <b>Time:</b> {data.time}
-            </p>
+            <hr>
 
-            <p>Thank you for choosing <b>DIAGNOAI</b> 💙.</p>
+            <p><b>Date:</b> {data.date}</p>
+            <p><b>Time:</b> {data.time}</p>
+            <p><b>Address:</b> {data.address}</p>
+
+            <br>
+
+            <p>Thank you for choosing <b>DIAGNOAI</b>. 💙</p>
             """,
             subtype="html"
         )
@@ -91,10 +93,10 @@ async def book_appointment(
         # ADMIN EMAIL
         # ==========================
         admin_msg = MessageSchema(
-            subject="New Appointment",
+            subject="New Appointment Booked",
             recipients=[admin_email],
             body=f"""
-            <h2>New Appointment Received</h2>
+            <h2>New Appointment</h2>
 
             <p><b>Patient:</b> {data.patient_name}</p>
 
@@ -112,27 +114,29 @@ async def book_appointment(
         )
 
         # ==========================
-        # SEND EMAIL (OPTIONAL)
+        # SEND EMAILS
         # ==========================
-        try:
-            await fm.send_message(user_msg)
-            await fm.send_message(admin_msg)
-            print("✅ Emails sent successfully")
+        await fm.send_message(user_msg)
+        await fm.send_message(admin_msg)
 
-        except Exception as email_error:
-            print("❌ Email sending failed:", email_error)
-            # Do not stop appointment booking
+        print("✅ Emails sent successfully")
+
+        # ==========================
+        # SAVE ONLY AFTER EMAIL SUCCESS
+        # ==========================
+        db.commit()
+        db.refresh(appointment)
 
         return {
             "message": "Appointment booked successfully",
-            "appointment_id": appointment.id,
-            "email_status": "sent_or_skipped"
+            "appointment_id": appointment.id
         }
 
     except Exception as e:
         db.rollback()
         print("❌ Appointment Error:", e)
+
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=f"Appointment booking failed: {str(e)}"
         )
