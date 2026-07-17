@@ -13,7 +13,7 @@ function Signature() {
       }}
       style={styles.container}
     >
-      ✍️ Made with ❤️ by
+      ✍️ Made by
       <span style={styles.name}>
         {" "}
         Zeeya Sinha

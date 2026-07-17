@@ -18,7 +18,7 @@ function Footer() {
       >
         <div style={styles.logo}>
           <FaHeartbeat color="gold" size={35} />
-          <h1 style={styles.heading}>DIAGNOAI</h1>
+          <h1 style={styles.heading}>DIAGNOCARE-AI</h1>
         </div>
 
         <p style={styles.text}>
@@ -36,7 +36,7 @@ function Footer() {
         <hr style={styles.hr} />
 
         <p style={styles.copy}>
-          © 2026 DIAGNOAI • All Rights Reserved
+          © 2026 DIAGNOCARE-AI • All Rights Reserved
         </p>
       </motion.div>
     </footer>

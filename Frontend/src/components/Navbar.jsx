@@ -27,7 +27,7 @@ function Navbar() {
       {/* LOGO */}
       <Link to="/" style={styles.logo}>
         <FaHeartbeat color="red" size={30} />
-        <span style={styles.logoText}>DIAGNOAI</span>
+        <span style={styles.logoText}>DIAGNOCARE-AI</span>
       </Link>
 
       {/* LINKS */}

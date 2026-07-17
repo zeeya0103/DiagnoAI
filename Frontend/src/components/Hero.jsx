@@ -15,7 +15,7 @@ function Hero() {
         <h1 style={styles.title}>
           Smart Healthcare with <br />
 
-          <span style={styles.red}>DIAGNOAI</span>
+          <span style={styles.red}>DIAGNOCARE-AI</span>
         </h1>
 
         <p style={styles.desc}>
