@@ -43,8 +43,8 @@ async def book_appointment(
     db: Session = Depends(get_db),
     current_user: FakeUser = Depends(get_fake_user)
 ):
-
     try:
+        # Save appointment in database
         appointment = AppointmentModel(
             user_id=current_user.id,
             patient_name=data.patient_name,
@@ -64,6 +64,9 @@ async def book_appointment(
             "diagnocare19@gmail.com"
         )
 
+        # ==========================
+        # USER EMAIL
+        # ==========================
         user_msg = MessageSchema(
             subject="Appointment Confirmed",
             recipients=[data.email],
@@ -79,16 +82,19 @@ async def book_appointment(
             <b>Time:</b> {data.time}
             </p>
 
-            <p>Thank you for choosing DIAGNOAI 💙.</p>
+            <p>Thank you for choosing <b>DIAGNOAI</b> 💙.</p>
             """,
             subtype="html"
         )
 
+        # ==========================
+        # ADMIN EMAIL
+        # ==========================
         admin_msg = MessageSchema(
             subject="New Appointment",
             recipients=[admin_email],
             body=f"""
-            <h2>New Appointment</h2>
+            <h2>New Appointment Received</h2>
 
             <p><b>Patient:</b> {data.patient_name}</p>
 
@@ -105,20 +111,28 @@ async def book_appointment(
             subtype="html"
         )
 
+        # ==========================
+        # SEND EMAIL (OPTIONAL)
+        # ==========================
         try:
             await fm.send_message(user_msg)
             await fm.send_message(admin_msg)
             print("✅ Emails sent successfully")
 
-        except Exception as e:
-            print("❌ EMAIL ERROR:", e)
-            raise HTTPException(status_code=500, detail=str(e))
+        except Exception as email_error:
+            print("❌ Email sending failed:", email_error)
+            # Do not stop appointment booking
 
         return {
             "message": "Appointment booked successfully",
-            "appointment_id": appointment.id
+            "appointment_id": appointment.id,
+            "email_status": "sent_or_skipped"
         }
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print("❌ Appointment Error:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
